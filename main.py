@@ -1,48 +1,116 @@
 import os
 import re
 import argparse
-import threading
+import asyncio
+from typing import List
+from aiobotocore.session import get_session
+from aiobotocore.client import AioBaseClient
+from typing import AsyncGenerator
 from pathlib import Path
-from tqdm import tqdm
+from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
 from s3 import init_s3_client
 
-s3_client = init_s3_client()
+# AWS Environment Variables
+AWS_BUCKET_NAME = os.environ["AWS_BUCKET_NAME"]
+DOWNLOAD_DIR = os.environ["DOWNLOAD_DIR"]
+
+# Initialize a single S3 session globally
+session = get_session()
 
 
-def get_file_size(bucket, key):
-    response = s3_client.head_object(Bucket=bucket, Key=key)
+async def get_file_size(s3_client: AsyncGenerator, bucket: str, key: str) -> str:
+    """
+    Get file size from S3 metadata.
+
+    Args:
+        s3_client (AsyncGenerator): S3 client
+        bucket (str): bucket name
+        key (str): object key
+
+    Returns:
+        int: file size in bytes
+    """
+    response = await s3_client.head_object(Bucket=bucket, Key=key)
     return response["ContentLength"]
 
 
-def download_with_progress(bucket, key, filename):
-    file_size = get_file_size(bucket, key)
+async def download_file(
+    s3_client: AsyncGenerator,
+    bucket: str,
+    key: str,
+    filename: str,
+    progress: Progress,
+    task_id: int,
+) -> None:
+    """
+    Download a single file with progress tracking.
 
-    # Create a progress bar
-    progress = tqdm(
-        total=file_size, unit="B", unit_scale=True, desc=f"Downloading {filename}"
-    )
+    Args:
+        s3_client (AsyncGenerator): S3 client
+        bucket (str): bucket name
+        key (str): object key
+        filename (str): name of the file to download
+        progress (Progress): rich Progress instance
+        task_id (int): task ID for the progress bar
+    """
+    file_path = Path(os.getenv("DOWNLOAD_DIR", ".")) / filename
 
-    def callback(chunk):
-        progress.update(chunk)
+    # Get file size
+    response = await s3_client.head_object(Bucket=bucket, Key=key)
+    file_size = response["ContentLength"]
 
-    s3_client.download_file(
-        Bucket=bucket, Key=key, Filename=filename, Callback=callback
-    )
-    progress.close()
+    # Update progress bar total
+    progress.update(task_id, total=file_size)
+
+    # Stream download to file
+    try:
+        # Await get_object to get the actual response object
+        response = await s3_client.get_object(Bucket=bucket, Key=key)
+        body = response["Body"]
+
+        # Open the file for writing
+        with open(file_path, "wb") as f:
+            while True:
+                # Read 8192 bytes at a time from the body
+                chunk = await body.read(8192)
+                if not chunk:
+                    break
+                f.write(chunk)
+                progress.update(task_id, advance=len(chunk))
+    except Exception as e:
+        progress.stop_task(task_id)
+        print(f"Error downloading {filename}: {e}")
 
 
-def availability(show_list=True) -> list:
+async def availability(show_list: bool = True) -> list:
+    """
+    Fetch list of available .zip files from S3.
+
+    Args:
+        show_list (bool, optional): Sometimes we need just get a list of available files without print to console.
+          Defaults to True.
+
+    Returns:
+        list: List of available .zip files
+    """
     pattern = r".*\.zip$"
     regex = re.compile(pattern)
 
-    response = s3_client.list_objects_v2(Bucket=os.environ["AWS_BUCKET_NAME"])
-    matching_files = [
-        obj["Key"] for obj in response.get("Contents", []) if regex.match(obj["Key"])
-    ]
+    async with init_s3_client() as s3_client:
+        if s3_client is None:
+            print("Error: AWS credentials not provided.")
+            return []
+        response = await s3_client.list_objects_v2(Bucket=AWS_BUCKET_NAME)
+        matching_files = [
+            obj["Key"]
+            for obj in response.get("Contents", [])
+            if regex.match(obj["Key"])
+        ]
 
     if not matching_files:
         print("No files found") if show_list else None
         return []
+
     if show_list:
         print("\nAvailable files:")
         for i, file in enumerate(matching_files, 1):
@@ -51,36 +119,78 @@ def availability(show_list=True) -> list:
     return matching_files
 
 
-def download_files(files_to_download):
-    Path(os.environ["DOWNLOAD_DIR"]).mkdir(parents=True, exist_ok=True)
-    threads = []
-    for file in files_to_download:
-        thread = threading.Thread(
-            target=download_with_progress,
-            args=(os.environ["AWS_BUCKET_NAME"], file, os.path.basename(file)),
-        )
-        thread.start()
-        threads.append(thread)
+async def download_files(files_to_download: List[str]):
+    """
+    Downloads multiple files concurrently, showing progress.
 
-    for thread in threads:
-        thread.join()
+    Args:
+        files_to_download (List[str]): List of files to download
+    """
+    Path(os.getenv("DOWNLOAD_DIR", ".")).mkdir(parents=True, exist_ok=True)
+
+    async with init_s3_client() as s3_client:
+        if s3_client is None:
+            print("Error: AWS credentials not provided.")
+            return
+
+        with Progress(
+            TextColumn("[bold blue]{task.fields[filename]}[/]"),
+            BarColumn(),
+            "[progress.percentage]{task.percentage:>3.0f}%",
+            TextColumn("•"),
+            TextColumn("{task.fields[file_size]}"),
+            TextColumn("•"),
+            TimeRemainingColumn(),
+        ) as progress:
+            tasks = []
+            for file in files_to_download:
+                filename = os.path.basename(file)
+                # Get file size and format it
+                file_size = await get_file_size(
+                    s3_client, os.getenv("AWS_BUCKET_NAME"), file
+                )
+                formatted_size = f"{file_size / 1024 / 1024:.1f}MB"
+                task_id = progress.add_task(
+                    f"Downloading {filename}",
+                    filename=filename,
+                    file_size=formatted_size,
+                    total=1,
+                )
+                tasks.append(
+                    download_file(
+                        s3_client,
+                        os.getenv("AWS_BUCKET_NAME"),
+                        file,
+                        filename,
+                        progress,
+                        task_id,
+                    )
+                )
+
+            await asyncio.gather(*tasks)
 
 
-def handle_download(specific_file=None):
-    available_files = availability()
+async def handle_download(specific_file: str = None):
+    """
+    Handle user selection for downloads.
+
+    Args:
+        specific_file (str, optional): File to download. Defaults to None.
+    """
+    available_files = await availability()
 
     if not available_files:
         return
 
     if specific_file:
         if specific_file in available_files:
-            download_files([specific_file])
+            await download_files([specific_file])
         else:
             print(f"Error: File '{specific_file}' not found")
             return
 
     elif len(available_files) == 1:
-        download_files(available_files)
+        await download_files(available_files)
 
     else:
         print(
@@ -94,15 +204,19 @@ def handle_download(specific_file=None):
                 if 0 <= idx < len(available_files):
                     selected_files.append(available_files[idx])
                 else:
-                    print(f"Invalid selection: {sel}")
-                    return
-            download_files(selected_files)
+                    print(f"Invalid selection: {sel}. Skipping.")
+            if not selected_files:
+                return
+            await download_files(selected_files)
         except ValueError:
             print("Invalid input. Please enter comma-separated numbers.")
             return
 
 
-def main():
+def main() -> None:
+    """
+    Main function to handle command line.
+    """
     parser = argparse.ArgumentParser(description="USDB SDK File Management")
     parser.add_argument(
         "action", choices=["availability", "download"], help="Action to perform"
@@ -112,9 +226,9 @@ def main():
     args = parser.parse_args()
 
     if args.action == "availability":
-        availability()
+        asyncio.run(availability())
     elif args.action == "download":
-        handle_download(args.filename)
+        asyncio.run(handle_download(args.filename))
 
 
 if __name__ == "__main__":
