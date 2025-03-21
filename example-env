@@ -1,0 +1,6 @@
+AWS_BUCKET_NAME=bucket_name
+AWS_ACCESS_KEY_ID=***
+AWS_SECRET_ACCESS_KEY=***
+AWS_ENDPOINT_URL=https://s3.us-east-1.wasabisys.com
+AWS_DEFAULT_REGION=us-east-1
+DOWNLOAD_DIR=output  # path where the downloaded files will be stored
