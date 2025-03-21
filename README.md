@@ -75,6 +75,9 @@ $ pytest test_main.py
 ```
 
 ### Environment Variables
+
+You need create a `.env` file in the root directory with the following variables:
+
 ```
 AWS_BUCKET_NAME=bucket_name
 AWS_ACCESS_KEY_ID=***
