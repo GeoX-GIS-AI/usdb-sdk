@@ -40,6 +40,7 @@ async def test_download_files():
             assert os.path.isfile(downloaded_path)
             os.remove(downloaded_path)
 
+
 @pytest.mark.asyncio
 async def test_handle_download():
     with TemporaryDirectory() as tmp_dir:
@@ -50,7 +51,7 @@ async def test_handle_download():
             # assert os.path.exists(downloaded_path)
             assert os.path.getsize(downloaded_path) > 0
             assert os.path.isfile(downloaded_path)
-            os.remove(downloaded_path)       
+            os.remove(downloaded_path)
 
 
 def test_main_availability(capsys):
