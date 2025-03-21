@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 import pytest
 from main import availability, download_files, handle_download, main
 from dotenv import load_dotenv, find_dotenv
