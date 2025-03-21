@@ -177,7 +177,8 @@ async def handle_download(specific_file: str = None):
     Args:
         specific_file (str, optional): File to download. Defaults to None.
     """
-    available_files = await availability()
+    show_list = specific_file is None
+    available_files = await availability(show_list=show_list)
 
     if not available_files:
         return
