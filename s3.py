@@ -3,7 +3,10 @@ from typing import AsyncGenerator
 import aiobotocore
 from aiobotocore.session import get_session
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv, find_dotenv
 
+# Load environment variables from .env file
+load_dotenv(find_dotenv())
 
 @asynccontextmanager
 async def init_s3_client() -> AsyncGenerator:

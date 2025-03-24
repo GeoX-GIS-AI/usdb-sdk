@@ -1,10 +1,26 @@
 ## USDB SDK File Management
 
+### Versions of Python supported
+- Python >= 3.8
+
 ### Installation
 ```
 $ python -m venv venv
 $ source venv/bin/activate
-$ pip install -r requirements/requirements.txt
+$ pip install -r requirements.txt
+```
+
+### Environment Variables
+
+You need change a `.env` file in the root directory with the following variables:
+
+```
+AWS_BUCKET_NAME=bucket_name
+AWS_ACCESS_KEY_ID=***
+AWS_SECRET_ACCESS_KEY=***
+AWS_ENDPOINT_URL=https://s3.us-east-1.wasabisys.com
+AWS_DEFAULT_REGION=us-east-1
+DOWNLOAD_DIR=output  # path where the downloaded files will be stored
 ```
 
 ### Usage
@@ -65,24 +81,4 @@ Multiple files found. Enter comma-separated numbers to download (e.g., 1,3):
 New_Hampshire_Footprints_1.1.zip ━━━━━━━━━━━━━━━━╺━━━━━━━━━━━━━━━━━━━━━━━  41% • 73.1MB  • 0:00:12
 Pennsylvania_Footprints_1.zip    ━━━╸━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   9% • 835.7MB • 0:02:06
 New_Hampshire_Footprints_2.zip   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━╸━━━━━━━━━━━  72% • 90.3MB  • 0:00:05
-```
-
-
-### Testing
-```
-$ pip install -r requirements/requirements_dev.txt
-$ pytest test_main.py
-```
-
-### Environment Variables
-
-You need create a `.env` file in the root directory with the following variables:
-
-```
-AWS_BUCKET_NAME=bucket_name
-AWS_ACCESS_KEY_ID=***
-AWS_SECRET_ACCESS_KEY=***
-AWS_ENDPOINT_URL=https://s3.us-east-1.wasabisys.com
-AWS_DEFAULT_REGION=us-east-1
-DOWNLOAD_DIR=output  # path where the downloaded files will be stored
 ```
