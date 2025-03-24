@@ -1,5 +1,3 @@
 python-dotenv
 aiobotocore
-awscli
 rich
-aiofiles
