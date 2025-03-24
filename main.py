@@ -4,11 +4,15 @@ import argparse
 import asyncio
 from typing import List
 from aiobotocore.session import get_session
-from aiobotocore.client import AioBaseClient
 from typing import AsyncGenerator
 from pathlib import Path
 from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
+from dotenv import load_dotenv, find_dotenv
+
 from s3 import init_s3_client
+
+# Load environment variables from .env file
+load_dotenv(find_dotenv())
 
 # AWS Environment Variables
 AWS_BUCKET_NAME = os.environ["AWS_BUCKET_NAME"]
