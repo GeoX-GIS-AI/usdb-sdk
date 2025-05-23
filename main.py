@@ -233,7 +233,7 @@ def main() -> None:
     if args.action == "availability":
         asyncio.run(availability())
     elif args.action == "download":
-        asyncio.run(handle_download(args.filename))
+        asyncio.get_event_loop().run_until_complete(handle_download(args.filename))
 
 
 if __name__ == "__main__":
