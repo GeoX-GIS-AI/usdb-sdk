@@ -231,7 +231,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.action == "availability":
-        asyncio.run(availability())
+        asyncio.get_event_loop().run_until_complete(availability(show_list=True))
     elif args.action == "download":
         asyncio.get_event_loop().run_until_complete(handle_download(args.filename))
 
