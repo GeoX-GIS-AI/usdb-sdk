@@ -97,7 +97,7 @@ async def availability(show_list: bool = True) -> list:
     Returns:
         list: List of available .zip files
     """
-    pattern = r".*\.zip$"
+    pattern = r".*\.(zip|csv)$"
     regex = re.compile(pattern)
 
     async with init_s3_client() as s3_client:
